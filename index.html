@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blockchain Simulator</title>
+  <style>
+    body {
+      background: #121212;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 2rem;
+      padding-bottom: 6rem;
+    }
+    h1 {
+      text-align: center;
+      color: #00ffcc;
+    }
+    #summary {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 1.1rem;
+      color: #a0ffc0;
+    }
+    #blockchain {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+    .block {
+      background: #1e1e1e;
+      border: 2px solid #00ffcc;
+      border-radius: 10px;
+      padding: 1rem;
+      width: 280px;
+      box-shadow: 0 0 10px #00ffcc66;
+      transition: all 0.5s ease;
+    }
+    .block.invalid {
+      border-color: red;
+      box-shadow: 0 0 10px red;
+    }
+    .block.validated {
+      border-color: limegreen;
+      box-shadow: 0 0 10px limegreen;
+    }
+    .block pre {
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+    }
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #1e1e1e;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 -2px 10px rgba(0, 255, 204, 0.2);
+    }
+    .footer button {
+      background: #00ffcc;
+      color: #121212;
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 0.5rem 0.5rem;
+      font-weight: bold;
+    }
+    .footer button:hover {
+      background: #00ccaa;
+    }
+    .footer .hack {
+      background: #ff0055;
+    }
+	
+		
+	    body {
+      background-color: #1e1e1e;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 100px;
+    }
+    .price {
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #ffc107;
+    }
+  </style>
+</head>
+<body>
+
+<body>
+
+  <div>Harga Bitcoin (BTC) dalam Ringgit Malaysia:</div>
+  <div class="price" id="btc-price">Loading...</div>
+
+  <script>
+    async function fetchBTC() {
+      try {
+        const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=MYR");
+        const data = await res.json();
+        const price = data.bitcoin.myr.toLocaleString('ms-MY', {
+          style: 'currency',
+          currency: 'MYR'
+        });
+        document.getElementById("btc-price").textContent = price;
+      } catch (e) {
+        document.getElementById("btc-price").textContent = "Error loading data";
+        console.error(e);
+      }
+    }
+
+    fetchBTC();
+    setInterval(fetchBTC, 10000); // Auto refresh setiap 10 saat
+  </script>
+
+  <h1>🔗 Blockchain Simulator</h1>
+  <div id="summary"></div>
+  <div id="blockchain"></div>
+  <div class="footer">
+    <button onclick="mineBlock()">Mine Block</button>
+    <button class="hack" onclick="hackBlock()">💀 Attempt Hack</button>
+    <button onclick="resetBlockchain()">🔁 Reset</button>
+    <div style="margin-top: 1rem; font-size: 0.9rem; color: #a0ffc0">
+      Harga BTC Tahun Ini: <span id="btcPrice"></span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script>
+    const blockchain = [];
+    let difficulty = 2;
+    let reward = 50;
+    let blockCount = 0;
+    let year = 2008;
+    let totalMined = 0;
+    const maxBTC = 21000000;
+    const halvingCycle = 4;
+    let cyclePress = 0;
+
+    const btcPriceHistory = {
+      2008: 0,
+      2012: 13,
+      2016: 430,
+      2020: 29000,
+      2024: 100000
+    };
+
+function getBTCPriceByYear(y) {
+  const knownYears = Object.keys(btcPriceHistory).map(Number).sort((a, b) => a - b);
+  const lastKnownYear = knownYears[knownYears.length - 1];
+  const lastKnownPrice = btcPriceHistory[lastKnownYear];
+
+  if (btcPriceHistory[y]) {
+    return btcPriceHistory[y];
+  }
+
+  if (y > lastKnownYear) {
+    const cyclesPassed = Math.floor((y - lastKnownYear) / 4);
+    return Math.floor(lastKnownPrice * Math.pow(1.5, cyclesPassed)); // Kenaikan 1.5x setiap 4 tahun
+  }
+
+  // fallback kalau tahun tak dijangka
+  return lastKnownPrice;
+}
+
+
+    function updateBTCPriceDisplay() {
+      const priceDisplay = document.getElementById('btcPrice');
+      const price = getBTCPriceByYear(year);
+      priceDisplay.innerText = `$${price.toLocaleString('en-US')}`;
+    }
+
+    function calculateHash(index, prevHash, timestamp, data, nonce) {
+      return CryptoJS.SHA256(index + prevHash + timestamp + JSON.stringify(data) + nonce).toString();
+    }
+
+    function mineBlock() {
+      if (totalMined >= maxBTC) return alert("🎉 Semua 21 juta BTC sudah dimined!");
+
+      const index = blockchain.length;
+      const prevHash = index > 0 ? blockchain[index - 1].hash : '0';
+      const timestamp = year;
+      const data = { amount: reward + ' BTC' };
+      let nonce = 0;
+      let hash = calculateHash(index, prevHash, timestamp, data, nonce);
+
+      while (!hash.startsWith('0'.repeat(difficulty))) {
+        nonce++;
+        hash = calculateHash(index, prevHash, timestamp, data, nonce);
+      }
+
+      const minedReward = Math.min(reward, maxBTC - totalMined);
+      totalMined += minedReward;
+
+      const block = { index, prevHash, timestamp, data: { amount: minedReward + ' BTC' }, nonce, hash };
+      blockchain.push(block);
+      displayBlockchain();
+
+      blockCount++;
+      cyclePress++;
+      if (cyclePress === halvingCycle) {
+        reward = Math.max(reward / 2, 0.00000001);
+        year += 4;
+        cyclePress = 0;
+      }
+
+      updateBTCPriceDisplay();
+    }
+
+    function hackBlock() {
+      if (blockchain.length === 0) return alert("Takda block nak hack lagi 😅");
+      const target = Math.floor(Math.random() * blockchain.length);
+      const hackedBlock = blockchain[target];
+      hackedBlock.data.amount = '999999 BTC (HACKED)';
+      hackedBlock.hash = calculateHash(hackedBlock.index, hackedBlock.prevHash, hackedBlock.timestamp, hackedBlock.data, hackedBlock.nonce);
+      hackedBlock.hacked = true;
+      displayBlockchain();
+
+      setTimeout(() => {
+        hackedBlock.data.amount = 'REVERTED (Hack Failed)';
+        hackedBlock.hash = calculateHash(hackedBlock.index, hackedBlock.prevHash, hackedBlock.timestamp, hackedBlock.data, hackedBlock.nonce);
+        hackedBlock.hacked = false;
+        displayBlockchain();
+      }, 5000);
+
+      alert(`😈 Block #${target} telah diubah. Hash baru dicipta, chain dah corrupted!`);
+    }
+
+    function resetBlockchain() {
+      blockchain.length = 0;
+      difficulty = 2;
+      reward = 50;
+      blockCount = 0;
+      year = 2008;
+      totalMined = 0;
+      cyclePress = 0;
+      updateBTCPriceDisplay();
+      displayBlockchain();
+    }
+
+    function validateBlockchain() {
+      let expectedReward = 50;
+      let minedBlockCount = 0;
+      let expectedCycle = 0;
+
+      for (let i = 0; i < blockchain.length; i++) {
+        const block = blockchain[i];
+        const recalculatedHash = calculateHash(block.index, block.prevHash, block.timestamp, block.data, block.nonce);
+        block.invalid = false;
+
+        if (!block.hash.startsWith('0'.repeat(difficulty)) || block.hash !== recalculatedHash) {
+          block.invalid = true;
+          continue;
+        }
+
+        if (i > 0 && block.prevHash !== blockchain[i - 1].hash) {
+          block.invalid = true;
+          continue;
+        }
+
+        const amountStr = typeof block.data.amount === "string" ? block.data.amount.replace(/ BTC.*$/, '') : '';
+        const amount = parseFloat(amountStr);
+
+        const expectedAmount = Math.min(expectedReward, maxBTC - getTotalUntil(i));
+
+        if (isNaN(amount) || amount !== expectedAmount) {
+          block.invalid = true;
+          continue;
+        }
+
+        minedBlockCount++;
+        expectedCycle++;
+        if (expectedCycle === halvingCycle) {
+          expectedReward = Math.max(expectedReward / 2, 0.00000001);
+          expectedCycle = 0;
+        }
+      }
+    }
+
+    function getTotalUntil(index) {
+      let total = 0;
+      for (let i = 0; i < index; i++) {
+        const amt = parseFloat(blockchain[i].data.amount.replace(/ BTC.*$/, '')) || 0;
+        total += amt;
+      }
+      return total;
+    }
+
+    function displayBlockchain() {
+      validateBlockchain();
+      const container = document.getElementById('blockchain');
+      const summary = document.getElementById('summary');
+      container.innerHTML = '';
+
+      // Tukar block dimined jadi reward * block count
+      const totalRewardDisplayed = blockchain.length * 52500;
+
+      summary.innerText = `Blockchain aktif dari tahun ${year}. Block dimined: ${totalRewardDisplayed.toLocaleString()} BlockChain BTC`;
+
+      blockchain.forEach(block => {
+        const blockEl = document.createElement('div');
+        blockEl.className = 'block';
+        if (block.invalid) blockEl.classList.add('invalid');
+        else if (block.hacked === false) blockEl.classList.add('validated');
+
+        blockEl.innerHTML = `<pre>
+Block #${block.index}
+Tahun: ${block.timestamp}
+Prev Hash: ${block.prevHash.slice(0, 15)}...
+Hash: ${block.hash.slice(0, 15)}...
+Nonce: ${block.nonce}
+Reward: ${block.data.amount}
+Status: ${block.invalid ? '❌ Invalid' : '✅ Valid'}
+</pre>`;
+        container.appendChild(blockEl);
+      });
+    }
+
+    resetBlockchain();
+  </script>
+</body>
+</html>
